@@ -2,47 +2,48 @@
     <img src="docs/android/images/banner_android_v4.png" alt="Liberty Recompiled for Android" width="800"/>
 </p>
 
-# LibertyRecompAndroid
+# LibertyRecompAndroid - Mali / Infinix Hot 60 Pro+ edition
 
-An Android port of [Liberty Recompiled](https://github.com/OZORDI/LibertyRecomp), the static
-recompilation of the Xbox 360 version of Grand Theft Auto IV. It runs the recompiled game natively
-on arm64 Android phones and handhelds with a Snapdragon (Adreno) GPU, using Vulkan through a bundled
-Mesa Turnip driver. There is no emulator in between.
+A fork of [vaduur/LibertyRecompAndroid](https://github.com/vaduur/LibertyRecompAndroid), the Android
+port of [Liberty Recompiled](https://github.com/OZORDI/LibertyRecomp) (the static recompilation of
+the Xbox 360 version of Grand Theft Auto IV). The game runs natively on arm64 Android phones with
+no emulator in between, using Vulkan.
+
+This fork targets phones with an **ARM Mali GPU and a MediaTek SoC**, specifically the
+**Infinix Hot 60 Pro+** (Helio G200: 2x Cortex-A76 + 6x Cortex-A55, Mali-G57 MC2). On a device
+without an Adreno GPU it:
+
+- uses a lighter first-launch profile (540p, anti-aliasing off, reduced traffic and pedestrians,
+  steady 30 FPS target);
+- skips the Adreno-only `TU_DEBUG` setting;
+- finds the fast CPU cores by `cpu_capacity` and keeps the two busiest threads on them;
+- reads the phone's thermal sensors for the thermal guard when there is no Adreno sensor.
+
+See [docs/android/MALI.md](docs/android/MALI.md) for details and tuning steps. Behaviour on Adreno
+phones is unchanged.
 
 <p align="center">
-    <img src="docs/android/images/ingame.jpg" alt="GTA IV running on a Retroid Pocket 5" width="800"/>
+    <img src="docs/android/images/ingame.jpg" alt="GTA IV running on a Retroid Pocket 5 (upstream)" width="800"/>
 </p>
 
-**DISCLAIMER!**
-
-# !!! THIS PROJECT IS ON HIATUS.
-
-## No updates for now. Got no time for it due to IRL stuff. Thanks for checking this out and for testing! From now on please, stick to forks and/or try to fork it yourself, with Claude it's actually quite easy to make this work better. I kinda achieved what I've wanted from this project -- this runs on my device quite OK (like on X360 that it was released for), so I'm stepping down for now. Thanks and bye!
-
-### - vaduur
-
-This is pure 100% AI slop. I didn't made this by hand at all, it's all thanks to Claude and I, vaduur, take ZERO credit or responsibility of this port being unstable. It will run shitty, that's a guarantee. All I did is spent couple of sleepless night testing and pointing out the issues. Oh, yeah, and spent some pocket change on Claude sub ofc. Please be aware of it and feel free to fork this repo or use it as a reference in your future ReXGlue to Android ports. Thank you and have a nice day.
-
-Issues are closed while the project is on hiatus.
-
+**About this fork.** The original port was made by vaduur, who has put it on hiatus and
+encouraged forks. Both the original port and the changes in this fork were written with the help of
+Claude (AI), so expect rough edges, and there is no warranty. Upstream issues and releases belong to
+vaduur's repository; this fork has no prebuilt APK yet, so build one with
+[BUILDING.md](docs/android/BUILDING.md).
 
 > [!CAUTION]
 > This is an experimental, unofficial port of a project that is itself in early development.
-> Expect crashes and rough edges. It has been developed and tested on **one device**, a
-> Retroid Pocket 5 (Snapdragon 865 / Adreno 650).
-
-> [!NOTE]
-> New features land in **[pre-releases](https://github.com/vaduur/LibertyRecompAndroid/releases)**
-> first, while they are being tested. The release marked *Latest* is the stable one. Pre-releases
-> are listed above it and marked *Pre-release*. Feedback on them is welcome in
-> [Issues](https://github.com/vaduur/LibertyRecompAndroid/issues).
+> Expect crashes and rough edges. Upstream was developed and tested on **one device**, a
+> Retroid Pocket 5 (Snapdragon 865 / Adreno 650). The Mali changes in this fork have **not been
+> tested on real hardware yet**, including the Infinix Hot 60 Pro+.
 
 **This project does not include any game assets.** You need your own legally obtained copy of the
 Xbox 360 game and its title update. Nothing here helps you get them.
 
 ## Status
 
-On the Retroid Pocket 5 with the default settings:
+Upstream status, measured on the Retroid Pocket 5 with the default settings (not this fork's Mali profile):
 
 - The game installs, boots and plays: the intro, the early story missions, free roam and driving
   have been played. Saves persist across launches.
@@ -96,7 +97,13 @@ geometry) and DXT textures are decoded on load (more memory, possible stutter wh
 Mali support exists thanks to the
 [Mali fork](https://github.com/prollynotzjay/LibertyRecompAndroidMaliVer) and the patch in
 [#62](https://github.com/vaduur/LibertyRecompAndroid/issues/62). Issues opened for Mali devices
-may not be fixed.
+may not be fixed upstream.
+
+**MediaTek Helio G200 / Mali-G57 MC2 (Infinix Hot 60 Pro+): untested, and the weakest class of
+device here.** Its GPU and CPU are well below the Snapdragon 865 the port was tuned on, so expect
+it to run only at reduced settings, if the phone's driver offers Vulkan 1.2 at all. This fork
+adds a lighter profile for it ([MALI.md](docs/android/MALI.md)); `last_launch.txt` shows the Vulkan
+version the phone reports.
 
 **Adreno 8xx (Snapdragon 8 Elite and newer): experimental, since 0.5.7.5.** The game has been
 started on an Adreno 840 (Samsung, Android 17). The bundled Turnip build does not support Adreno
@@ -169,7 +176,9 @@ console and disc.
 
 ## Quick start
 
-1. Install `LibertyRecompAndroid-*.apk` from the [Releases](../../releases) page and open it. The
+1. Build the APK ([BUILDING.md](docs/android/BUILDING.md); this fork has no prebuilt release yet)
+   or install an upstream `LibertyRecompAndroid-*.apk` from vaduur's
+   [Releases](https://github.com/vaduur/LibertyRecompAndroid/releases), then open it. The
    app opens on a launcher with the game status, the installer, the Vulkan driver choice and
    **Play** (see [INSTALL.md](docs/android/INSTALL.md#2-open-the-app-the-launcher)).
 2. In the **Game** panel (0.5.7 and newer), choose your disc image (`*.iso`) and the Title Update 8
@@ -193,6 +202,7 @@ The full walkthrough, including the `install/` folder and older versions, is in
 | Document | Contents |
 |---|---|
 | [Installation and first launch](docs/android/INSTALL.md) | Installing the APK, copying the game files, the first-run installer, upgrading |
+| [Mali / MediaTek devices](docs/android/MALI.md) | The Infinix Hot 60 Pro+ profile, what changes on non-Adreno GPUs, and tuning steps |
 | [Advanced configuration](docs/android/ADVANCED.md) | `args.txt` settings, live tuning, driver selection, logs, performance presets |
 | [What was done for Android](docs/android/PORTING.md) | Technical write-up of the port: build, platform layer, driver, renderer and stability work |
 | [Building from source](docs/android/BUILDING.md) | Building the APK yourself |
@@ -200,6 +210,10 @@ The full walkthrough, including the `install/` folder and older versions, is in
 
 ## Credits
 
+- [vaduur/LibertyRecompAndroid](https://github.com/vaduur/LibertyRecompAndroid) by vaduur, the Android
+  port this repository is forked from, and the
+  [Mali fork](https://github.com/prollynotzjay/LibertyRecompAndroidMaliVer) by prollynotzjay behind
+  the first Mali support.
 - [Liberty Recompiled](https://github.com/OZORDI/LibertyRecomp) by OZORDI and contributors, and the
   [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) it is built on. Almost all of the hard work
   of recompiling GTA IV is theirs. This fork adds the Android platform layer and the Android
