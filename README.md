@@ -10,13 +10,14 @@ the Xbox 360 version of Grand Theft Auto IV). The game runs natively on arm64 An
 no emulator in between, using Vulkan.
 
 This fork targets phones with an **ARM Mali GPU and a MediaTek SoC**, specifically the
-**Infinix Hot 60 Pro+** (Helio G200: 2x Cortex-A76 + 6x Cortex-A55, Mali-G57 MC2). On a device
+**Infinix Hot 60 Pro / Pro+** (Helio G200: 2x Cortex-A76 + 6x Cortex-A55, Mali-G57 MC2). On a device
 without an Adreno GPU it:
 
 - uses a lighter first-launch profile (540p, anti-aliasing off, reduced traffic and pedestrians,
   steady 30 FPS target);
 - skips the Adreno-only `TU_DEBUG` setting;
 - finds the fast CPU cores by `cpu_capacity` and keeps the two busiest threads on them;
+- asks for a 60 Hz panel mode and keeps guest vblanks at 60 Hz on 144 Hz and 90 Hz screens;
 - reads the phone's thermal sensors for the thermal guard when there is no Adreno sensor.
 
 See [docs/android/MALI.md](docs/android/MALI.md) for details and tuning steps. Behaviour on Adreno
@@ -99,7 +100,7 @@ Mali support exists thanks to the
 [#62](https://github.com/vaduur/LibertyRecompAndroid/issues/62). Issues opened for Mali devices
 may not be fixed upstream.
 
-**MediaTek Helio G200 / Mali-G57 MC2 (Infinix Hot 60 Pro+): untested, and the weakest class of
+**MediaTek Helio G200 / Mali-G57 MC2 (Infinix Hot 60 Pro / Pro+): untested, and the weakest class of
 device here.** Its GPU and CPU are well below the Snapdragon 865 the port was tuned on, so expect
 it to run only at reduced settings, if the phone's driver offers Vulkan 1.2 at all. This fork
 adds a lighter profile for it ([MALI.md](docs/android/MALI.md)); `last_launch.txt` shows the Vulkan

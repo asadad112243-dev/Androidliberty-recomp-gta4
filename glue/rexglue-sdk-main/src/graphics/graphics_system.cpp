@@ -37,6 +37,7 @@
 #include <android/looper.h>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #endif
 
 REXCVAR_DEFINE_STRING(trace_gpu_prefix, "", "GPU", "GPU trace file prefix");
@@ -186,14 +187,46 @@ X_STATUS GraphicsSystem::SetupGuestGpu(runtime::FunctionDispatcher* function_dis
               AChoreographer* choreographer;
               int64_t guest_interval_ns;
               int64_t last_vblank_ns = 0;
+              int64_t previous_frame_ns = 0;  // last callback, to measure the panel's period
+              int64_t period_ns = 0;          // measured display period (smoothed)
+              int64_t next_due_ns = 0;        // fractional-rate panels: next guest vblank time
               std::atomic<int64_t> last_callback_ns{0};
             };
             static void (*const kCallback)(long, void*) = [](long frame_time_ns, void* data) {
               auto* state = static_cast<DisplayVsync*>(data);
-              // Keep the guest rate on faster panels: skip callbacks that come
-              // well inside one guest interval.
-              if (!state->last_vblank_ns ||
-                  frame_time_ns - state->last_vblank_ns >= state->guest_interval_ns * 3 / 4) {
+              if (state->previous_frame_ns) {
+                const int64_t delta = frame_time_ns - state->previous_frame_ns;
+                if (delta > 0 && delta < 100'000'000) {
+                  state->period_ns =
+                      state->period_ns ? (state->period_ns * 15 + delta) / 16 : delta;
+                }
+              }
+              state->previous_frame_ns = frame_time_ns;
+              // How many display periods make one guest interval. Whole numbers
+              // (60, 120, 180 Hz panels for a 60 Hz guest) keep the simple rule below.
+              // Fractional ratios (144 Hz is 2.4, 90 Hz is 1.5) would otherwise run the
+              // guest at 72 or 45 Hz, so those use a phase accumulator that averages
+              // exactly the guest rate, with the unavoidable alternating spacing.
+              const double ratio = state->period_ns ? double(state->guest_interval_ns) /
+                                                          double(state->period_ns)
+                                                    : 0.0;
+              const bool fractional = state->period_ns && std::abs(ratio - std::round(ratio)) > 0.15;
+              bool vblank = false;
+              if (!fractional) {
+                // Keep the guest rate on faster panels: skip callbacks that come
+                // well inside one guest interval.
+                vblank = !state->last_vblank_ns ||
+                         frame_time_ns - state->last_vblank_ns >= state->guest_interval_ns * 3 / 4;
+              } else {
+                // First callback, or the schedule fell a whole interval behind: restart it.
+                if (!state->next_due_ns ||
+                    frame_time_ns > state->next_due_ns + state->guest_interval_ns) {
+                  state->next_due_ns = frame_time_ns;
+                }
+                vblank = frame_time_ns + state->period_ns / 2 >= state->next_due_ns;
+                if (vblank) state->next_due_ns += state->guest_interval_ns;
+              }
+              if (vblank) {
                 state->last_vblank_ns = frame_time_ns;
                 state->system->MarkVblank();
               }

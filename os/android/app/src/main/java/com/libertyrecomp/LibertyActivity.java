@@ -68,6 +68,13 @@ public class LibertyActivity extends SDLActivity {
     private static final String SURFACE_ARGUMENT = "--android_surface=";
     private int mSurfaceWidth;
     private int mSurfaceHeight;
+    /**
+     * "--android_display_hz=N" in args.txt: ask Android for the display mode that runs at N Hz
+     * (0 = leave the panel as the system set it). Guest vblanks are derived from the display's
+     * vsync, and a 144 Hz or 90 Hz panel does not divide evenly into the console's 60 Hz.
+     */
+    private static final String DISPLAY_HZ_ARGUMENT = "--android_display_hz=";
+    private float mDisplayHz;
     private String mDriverMode = DriverBridge.TURNIP;
     /** driver.txt as found, for the launch report. */
     private String mDriverText;
@@ -99,6 +106,7 @@ public class LibertyActivity extends SDLActivity {
         super.onCreate(savedInstanceState);
         // A controller-driven game sends no touch events for minutes at a time.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        applyDisplayRefreshRate();
         // Steady clocks the device can hold, instead of peaks followed by
         // throttling (only where the device supports it).
         Intent intent = getIntent();
@@ -108,6 +116,40 @@ public class LibertyActivity extends SDLActivity {
             if (supported) getWindow().setSustainedPerformanceMode(true);
             android.util.Log.w("LibertyRecomp", "sustained performance mode: "
                     + (supported ? "on" : "not supported by this device"));
+        }
+    }
+
+    /**
+     * Requests the panel mode at {@link #mDisplayHz}, keeping the current resolution. Falls back
+     * to a plain preferred refresh rate when no exact mode exists. It is a hint: the system (or a
+     * vendor game-mode setting) may still pick another rate, which the renderer's vblank timing
+     * tolerates.
+     */
+    @SuppressWarnings("deprecation")
+    private void applyDisplayRefreshRate() {
+        if (mDisplayHz <= 0f) return;
+        try {
+            android.view.Display display = getWindowManager().getDefaultDisplay();
+            android.view.Display.Mode current = display.getMode();
+            android.view.Display.Mode match = null;
+            for (android.view.Display.Mode mode : display.getSupportedModes()) {
+                if (mode.getPhysicalWidth() != current.getPhysicalWidth()
+                        || mode.getPhysicalHeight() != current.getPhysicalHeight()) continue;
+                if (Math.abs(mode.getRefreshRate() - mDisplayHz) > 0.5f) continue;
+                match = mode;
+                break;
+            }
+            WindowManager.LayoutParams params = getWindow().getAttributes();
+            if (match != null) {
+                params.preferredDisplayModeId = match.getModeId();
+            } else {
+                params.preferredRefreshRate = mDisplayHz;
+            }
+            getWindow().setAttributes(params);
+            Log.w(TAG, "display: was " + current.getRefreshRate() + " Hz, asked for " + mDisplayHz
+                    + " Hz (" + (match != null ? "mode " + match.getModeId() : "preferred rate") + ")");
+        } catch (RuntimeException e) {
+            Log.w(TAG, "cannot request " + mDisplayHz + " Hz", e);
         }
     }
 
@@ -319,6 +361,16 @@ public class LibertyActivity extends SDLActivity {
                     mSurfaceWidth = Integer.parseInt(size[0].trim());
                     mSurfaceHeight = Integer.parseInt(size[1].trim());
                 }
+            } catch (NumberFormatException e) {
+                Log.w(TAG, "bad " + argument);
+            }
+        }
+        for (int i = arguments.size() - 1; i >= 0; --i) {
+            String argument = arguments.get(i);
+            if (!argument.startsWith(DISPLAY_HZ_ARGUMENT)) continue;
+            arguments.remove(i);  // Java-side setting; the runtime does not know it.
+            try {
+                mDisplayHz = Float.parseFloat(argument.substring(DISPLAY_HZ_ARGUMENT.length()).trim());
             } catch (NumberFormatException e) {
                 Log.w(TAG, "bad " + argument);
             }

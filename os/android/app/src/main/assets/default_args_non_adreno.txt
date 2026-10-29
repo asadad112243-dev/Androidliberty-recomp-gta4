@@ -39,3 +39,8 @@
 # Lower the draw distance before the phone throttles, restore it when cool,
 # trading distant detail for steady clocks instead of sudden frame drops.
 --android_thermal_guard=true
+
+# Ask Android for the 60 Hz panel mode. Guest vblanks come from the display's vsync and
+# a 60 Hz guest divides evenly into 60 and 120 Hz, not into 144 Hz (Infinix Hot 60 Pro)
+# or 90 Hz. 60 also runs cooler than 120 or 144. 0 leaves the panel as the system set it.
+--android_display_hz=60
