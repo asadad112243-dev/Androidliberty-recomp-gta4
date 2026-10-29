@@ -70,23 +70,40 @@ ThreadStat ReadThreadStat(pid_t tid) {
   return {utime + stime, nice <= -16 ||policy == 1 || policy == 2};
 }
 
+long ReadSysfsLong(const char* format, int cpu) {
+  char path[96];
+  std::snprintf(path, sizeof(path), format, cpu);
+  long value = 0;
+  if (FILE* file = std::fopen(path, "r")) {
+    if (std::fscanf(file, "%ld", &value) != 1) value = 0;
+    std::fclose(file);
+  }
+  return value;
+}
+
+// Fastest core first. The kernel's cpu_capacity (normalized per-core performance)
+// ranks first: on mid-range SoCs such as the Helio G200 (2x A76 at 2.2 GHz,
+// 6x A55 at 2.0 GHz) the clock difference alone is too small to tell big from
+// little reliably. Max frequency breaks ties, then the lower core number.
 std::vector<int> CoresByMaxFrequency() {
-  std::vector<std::pair<long, int>> cores;
+  struct Core {
+    long capacity;
+    long frequency;
+    int cpu;
+  };
+  std::vector<Core> cores;
   const long count = sysconf(_SC_NPROCESSORS_CONF);
   for (int cpu = 0; cpu < count && cpu < CPU_SETSIZE; ++cpu) {
-    char path[96];
-    std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", cpu);
-    long frequency = 0;
-    if (FILE* file = std::fopen(path, "r")) {
-      if (std::fscanf(file, "%ld", &frequency) != 1) frequency = 0;
-      std::fclose(file);
-    }
-    cores.emplace_back(frequency, cpu);
+    cores.push_back(
+        {ReadSysfsLong("/sys/devices/system/cpu/cpu%d/cpu_capacity", cpu),
+         ReadSysfsLong("/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", cpu), cpu});
   }
-  std::stable_sort(cores.begin(), cores.end(),
-                   [](const auto& a, const auto& b) { return a.first > b.first; });
+  std::stable_sort(cores.begin(), cores.end(), [](const Core& a, const Core& b) {
+    if (a.capacity != b.capacity) return a.capacity > b.capacity;
+    return a.frequency > b.frequency;
+  });
   std::vector<int> result;
-  for (const auto& [frequency, cpu] : cores) result.push_back(cpu);
+  for (const Core& core : cores) result.push_back(core.cpu);
   return result;
 }
 

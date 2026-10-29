@@ -1,23 +1,41 @@
 --log_level=warn
 # First-launch profile for non-Adreno GPUs (Mali, PowerVR...). The standard
 # profile is tuned on a Snapdragon 865; mid-range chips such as the Helio G200
-# (2x Cortex-A76 + 6x Cortex-A55, Mali-G57 MC2) have far less CPU and GPU
-# headroom, so this one asks for fewer draws and less CPU work per frame.
-# Display settings (resolution, upscaler, AA, shadows, motion blur) belong to the
-# in-game Display menu: lower the resolution and turn AA off there first.
+# (2x Cortex-A76 + 6x Cortex-A55, Mali-G57 MC2, Infinix Hot 60 Pro+) have far
+# less CPU and GPU headroom, so this one asks for fewer draws, less CPU work per
+# frame and steadier clocks. Details: docs/android/MALI.md.
+#
+# Unlike the standard profile, a few display lines are set here because the
+# default (720p) is too heavy for a Mali-G57 MC2. They override the in-game
+# Display menu on every launch: delete a line to hand that setting back to the menu.
+--gta4_output_height_cap=540
+--gta4_native_anti_aliasing=off
+--gta4_motion_blur=false
+
 --gta4_dynamic_draw_distance=true
 # Keep at 0.80 or above: lower values broke dynamic shadows (see the migrations
 # in LibertyActivity).
 --gta4_dynamic_draw_distance_min=0.80
 --gta4_shadow_distance_scale=1.0
 --gta4_reflection_capture_distance=near
-# Fewer cars and pedestrians: less CPU work for the few fast cores and fewer draws.
+--gta4_reflection_aa=off
+
+# Fewer cars and pedestrians: less CPU work for the two fast cores, fewer draws.
 --gta4_traffic_density_scale=0.3
 --gta4_parked_car_density_scale=0.3
 --gta4_ped_density_scale=0.3
 --gta4_scenario_ped_density_scale=0.3
+
 --gta4_profile_native_detailed_cpu=false
 --gta4_profile_native_detailed_gpu=false
 --gta4_native_max_queued_frames=3
 # While frames miss 30 FPS, refresh the environment reflection every other frame.
 --gta4_fps_guard=2
+--gta4_frame_limit=30
+
+# Keep the two busiest threads (render + recorder) on the two Cortex-A76 cores
+# and everything else on the A55s. Raise to 3 or lower to 0 if it hurts.
+--gta4_thread_pinning=2
+# Lower the draw distance before the phone throttles, restore it when cool,
+# trading distant detail for steady clocks instead of sudden frame drops.
+--android_thermal_guard=true

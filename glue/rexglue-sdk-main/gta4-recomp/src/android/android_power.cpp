@@ -25,7 +25,9 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -104,14 +106,51 @@ int64_t ThreadCpuNanoseconds(pid_t tid) {
 
 // The busiest threads over the last interval, by CPU time.
 // Adreno GPU temperature in degrees C (kgsl reports millidegrees); NaN if absent.
-float GpuTemperature() {
+float ReadTemperature(const char* path) {
   float value = __builtin_nanf("");
-  if (FILE* file = std::fopen("/sys/class/kgsl/kgsl-3d0/temp", "r")) {
+  if (FILE* file = std::fopen(path, "r")) {
     long raw = 0;
     if (std::fscanf(file, "%ld", &raw) == 1) value = raw > 1000 ? float(raw) / 1000.0f : float(raw);
     std::fclose(file);
   }
   return value;
+}
+
+// Thermal zone of a non-Adreno SoC (Mali, MediaTek...), found once by name: a GPU
+// zone if there is one, otherwise the CPU/SoC zone that heats up with the game.
+// Empty when the device exposes none to apps.
+std::string FindThermalZonePath() {
+  static const char* const kPreferred[] = {"gpu", "mali", "soc", "cpu", "mtktscpu", "tsens"};
+  std::string best;
+  int best_rank = 99;
+  for (int zone = 0; zone < 64; ++zone) {
+    char path[96];
+    std::snprintf(path, sizeof(path), "/sys/class/thermal/thermal_zone%d/type", zone);
+    FILE* file = std::fopen(path, "r");
+    if (!file) continue;
+    char type[64] = {};
+    if (!std::fgets(type, sizeof(type), file)) type[0] = 0;
+    std::fclose(file);
+    std::string name(type);
+    for (char& c : name) c = char(std::tolower(static_cast<unsigned char>(c)));
+    for (int rank = 0; rank < int(sizeof(kPreferred) / sizeof(kPreferred[0])); ++rank) {
+      if (name.find(kPreferred[rank]) == std::string::npos || rank >= best_rank) continue;
+      std::snprintf(path, sizeof(path), "/sys/class/thermal/thermal_zone%d/temp", zone);
+      if (!std::isnan(ReadTemperature(path))) {  // readable by apps?
+        best = path;
+        best_rank = rank;
+      }
+      break;
+    }
+  }
+  return best;
+}
+
+float GpuTemperature() {
+  const float adreno = ReadTemperature("/sys/class/kgsl/kgsl-3d0/temp");
+  if (adreno == adreno) return adreno;
+  static const std::string zone = FindThermalZonePath();
+  return zone.empty() ? __builtin_nanf("") : ReadTemperature(zone.c_str());
 }
 
 std::vector<pid_t> BusiestThreads(std::unordered_map<pid_t, int64_t>& previous, size_t count) {
